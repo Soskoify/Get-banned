@@ -1,0 +1,62 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local SPEED_MULTIPLIER = 1.5
+local BASE_OFFSET = Vector3.new(0, -1.8, 0)
+local ROTATION_ANGLE = CFrame.Angles(math.rad(85), 0, 0)
+local FORCE_MAGNITUDE = humanoid.WalkSpeed * SPEED_MULTIPLIER
+local UPWARD_FORCE = 50
+
+local bodyVelocity
+local originalHipHeight = humanoid.HipHeight
+local originalAutoRotate = humanoid.AutoRotate
+
+humanoid.HipHeight = originalHipHeight + BASE_OFFSET.Y
+humanoid.AutoRotate = false
+humanoid.PlatformStand = true
+rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 100, 0) * ROTATION_ANGLE
+
+bodyVelocity = Instance.new("BodyVelocity")
+bodyVelocity.MaxForce = Vector3.new(5000, 5000, 5000)
+bodyVelocity.P = 1000
+bodyVelocity.Parent = rootPart
+
+for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
+	if v:IsA("RemoteEvent") then
+		pcall(function()
+			v:FireServer()
+		end)
+	elseif v:IsA("RemoteFunction") then
+		pcall(function()
+			v:InvokeServer()
+		end)
+	end
+end
+
+RunService.Heartbeat:Connect(function()
+	if bodyVelocity and rootPart then
+		local lookVector = workspace.CurrentCamera.CFrame.LookVector
+		local horizontalLook = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
+		bodyVelocity.Velocity = (horizontalLook * FORCE_MAGNITUDE) + Vector3.new(0, UPWARD_FORCE, 0)
+		rootPart.CFrame = CFrame.new(rootPart.Position, rootPart.Position + horizontalLook) * ROTATION_ANGLE
+	end
+end)
+
+player.CharacterAdded:Connect(function(newCharacter)
+	character = newCharacter
+	humanoid = character:WaitForChild("Humanoid")
+	rootPart = character:WaitForChild("HumanoidRootPart")
+	originalHipHeight = humanoid.HipHeight
+	originalAutoRotate = humanoid.AutoRotate
+	
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+end)
